@@ -26,7 +26,7 @@ Vagrant.configure("2") do |config|
       end
     end
 
-    # config.vm.provision "shell", inline: "/vagrant/server_init.sh"
+    config.vm.provision "shell", inline: "/vagrant/node_init.sh all"
 
   end
   
