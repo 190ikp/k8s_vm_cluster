@@ -14,11 +14,6 @@ setup_packages() {
     linux-headers-"$(uname -r)"
 }
 
-setup_network() {
-  envsubst \$HOSTNAME < /vagrant/conf/hosts |
-    sudo dd of=/etc/hosts
-}
-
 setup_docker() {
 
   sudo apt install --yes \
@@ -65,7 +60,7 @@ setup_k8s() {
 all() {
 
   setup_packages
-  setup_network
+  # setup_network
   setup_k8s
 
   echo 'All setup is finished.'
