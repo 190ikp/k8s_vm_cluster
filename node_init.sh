@@ -60,7 +60,7 @@ setup_k8s() {
 all() {
 
   setup_packages
-  # setup_network
+
   setup_k8s
 
   echo 'All setup is finished.'
