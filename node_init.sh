@@ -52,9 +52,9 @@ setup_k8s() {
 
   sudo apt update
   sudo apt install --yes \
-    kubelet
+    kubelet kubeadm kubectl
   sudo apt-mark hold \
-    kubelet
+    kubelet kubeadm kubectl
 }
 
 all() {
