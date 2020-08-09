@@ -10,6 +10,8 @@ HASH=$(sed -n 2p /vagrant/token.list)
 
 sudo apt install --yes ufw
 sudo ufw --force reset
+# for vagrant ssh
+sudo ufw allow 22/tcp
 # see: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#check-required-ports
 sudo ufw allow 10250/tcp
 sudo ufw allow 30000:32767/tcp

@@ -6,6 +6,8 @@ set -euo pipefail
 
 sudo apt install --yes ufw
 sudo ufw --force reset
+# for vagrant ssh
+sudo ufw allow 22/tcp
 # see: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#check-required-ports
 sudo ufw allow "$API_SERVER_PORT"/tcp
 sudo ufw allow 2379:2380/tcp
