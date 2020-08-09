@@ -54,8 +54,7 @@ Vagrant.configure("2") do |config|
       master.vm.network "forwarded_port", guest: 443, host: 8443, host_ip: "127.0.0.#{i}"
       master.vm.provision "shell", privileged: false, env: {"CONTROL_PLANE_ENDPOINT" => control_plane_endpoint, "API_SERVER_PORT" => k8s_api_port}, inline: <<-SHELL
         cd /vagrant
-        ./node_init.sh all
-        ./master_init.sh
+        ./node_init.sh master
       SHELL
     end
   end
@@ -71,8 +70,7 @@ Vagrant.configure("2") do |config|
       worker.vm.network "private_network", ip: "10.10.10.2#{i}", virtualbox__intnet: "k8s"
       worker.vm.provision "shell", privileged: false, env: {"CONTROL_PLANE_ENDPOINT" => control_plane_endpoint, "API_SERVER_PORT" => k8s_api_port}, inline: <<-SHELL
         cd /vagrant
-        ./node_init.sh all
-        ./worker_init.sh
+        ./node_init.sh worker
       SHELL
     end
   end

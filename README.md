@@ -2,7 +2,7 @@
 
 Required:
 
-- vitualbox
+- virtualbox
 - vagrant
 - `vagrant-hosts` plugin
 - `vagrant-cachier` plugin (optional)
