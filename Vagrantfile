@@ -52,10 +52,12 @@ Vagrant.configure("2") do |config|
       master.vm.network "private_network", ip: "10.10.10.1#{i}", virtualbox__intnet: "k8s"
       master.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.#{i}"
       master.vm.network "forwarded_port", guest: 443, host: 8443, host_ip: "127.0.0.#{i}"
-      master.vm.provision "shell", privileged: false, env: {"CONTROL_PLANE_ENDPOINT" => control_plane_endpoint, "API_SERVER_PORT" => k8s_api_port}, inline: <<-SHELL
-        cd /vagrant
-        ./node_init.sh master
-      SHELL
+      master.vm.provision "shell" do |s|
+        s.privileged = false
+        s.env = {"CONTROL_PLANE_ENDPOINT" => control_plane_endpoint, "API_SERVER_PORT" => k8s_api_port}
+        s.path = "node_init.sh" 
+        s.args = ["master"]
+      end
     end
   end
 
@@ -68,10 +70,12 @@ Vagrant.configure("2") do |config|
       end
 
       worker.vm.network "private_network", ip: "10.10.10.2#{i}", virtualbox__intnet: "k8s"
-      worker.vm.provision "shell", privileged: false, env: {"CONTROL_PLANE_ENDPOINT" => control_plane_endpoint, "API_SERVER_PORT" => k8s_api_port}, inline: <<-SHELL
-        cd /vagrant
-        ./node_init.sh worker
-      SHELL
+      worker.vm.provision "shell" do |s|
+        s.privileged = false
+        s.env = {"CONTROL_PLANE_ENDPOINT" => control_plane_endpoint, "API_SERVER_PORT" => k8s_api_port}
+        s.path = "node_init.sh" 
+        s.args = ["worker"]
+      end
     end
   end
 end

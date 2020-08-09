@@ -80,24 +80,27 @@ master(){
   sudo systemctl daemon-reload
   sudo systemctl restart kubelet
 
-  # see: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#initializing-your-control-plane-node
-  sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint="$CONTROL_PLANE_ENDPOINT"
+  if [ "$(hostname)" = "master-1" ]; then
+    # see: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#initializing-your-control-plane-node
+    sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint="$CONTROL_PLANE_ENDPOINT"
 
-  sudo kubeadm token create |
-    sudo tee /vagrant/token.list
+    # create pod network by flannel
+    sudo kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 
-  openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt |
-    openssl rsa -pubin -outform der 2>/dev/null |
-    openssl dgst -sha256 -hex |
-    sed 's/^.* //' |
-    sudo tee -a /vagrant/token.list
+    # make token list file
+    sudo kubeadm token create |
+      sudo tee /vagrant/token.list
+    openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt |
+      openssl rsa -pubin -outform der 2>/dev/null |
+      openssl dgst -sha256 -hex |
+      sed 's/^.* //' |
+      sudo tee -a /vagrant/token.list
+  fi
 
   # To make kubectl work for your non-root user.
   mkdir -p "$HOME/.kube"
   sudo cp -f /etc/kubernetes/admin.conf "$HOME/.kube/config"
   sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
-
-  sudo kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 }
 
 
