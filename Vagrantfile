@@ -52,6 +52,7 @@ Vagrant.configure("2") do |config|
       master.vm.network "private_network", ip: "10.10.10.1#{i}", virtualbox__intnet: "k8s"
       master.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.#{i}"
       master.vm.network "forwarded_port", guest: 443, host: 8443, host_ip: "127.0.0.#{i}"
+      master.vm.network "forwarded_port", guest: 6443, host: 6443, host_ip: "127.0.0.#{i}"
       master.vm.provision "shell" do |s|
         s.privileged = false
         s.env = {"CONTROL_PLANE_ENDPOINT" => control_plane_endpoint, "API_SERVER_PORT" => k8s_api_port}
@@ -79,4 +80,3 @@ Vagrant.configure("2") do |config|
     end
   end
 end
-  

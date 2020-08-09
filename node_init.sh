@@ -68,6 +68,8 @@ master(){
   sudo ufw --force reset
   # for vagrant ssh
   sudo ufw allow 22/tcp
+  sudo ufw allow 80/tcp
+  sudo ufw allow 443/tcp
   # see: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#check-required-ports
   sudo ufw allow "$API_SERVER_PORT"/tcp
   sudo ufw allow 2379:2380/tcp
@@ -84,8 +86,13 @@ master(){
     # see: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#initializing-your-control-plane-node
     sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint="$CONTROL_PLANE_ENDPOINT"
 
+    # To make kubectl work for your non-root user.
+    mkdir -p "$HOME/.kube"
+    sudo cp -f /etc/kubernetes/admin.conf "$HOME/.kube/config"
+    sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
+
     # create pod network by flannel
-    sudo kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+    kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 
     # make token list file
     sudo kubeadm token create |
@@ -96,11 +103,6 @@ master(){
       sed 's/^.* //' |
       sudo tee -a /vagrant/token.list
   fi
-
-  # To make kubectl work for your non-root user.
-  mkdir -p "$HOME/.kube"
-  sudo cp -f /etc/kubernetes/admin.conf "$HOME/.kube/config"
-  sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
 }
 
 
