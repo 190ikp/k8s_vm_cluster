@@ -30,11 +30,14 @@ setup_docker() {
     stable"
 
   sudo apt update
-  # installed version is 18.09 for k8s support
   sudo apt install --yes \
-    docker-ce=5:18.09.9~3-0~ubuntu-bionic \
-    docker-ce-cli=5:18.09.9~3-0~ubuntu-bionic
-  sudo apt-mark hold docker-ce docker-ce-cli
+    docker-ce \
+    docker-ce-cli \
+    containerd.io
+  sudo apt-mark hold \
+    docker-ce \
+    docker-ce-cli \
+    containerd.io
 }
 
 setup_k8s() {

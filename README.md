@@ -1,11 +1,14 @@
-# VM Auto Provision for Testing Kubernetes Cluster
+# VM Auto Provision for Testing Kubernetes cluster
 
-required
+Required:
 
 - vitualbox
 - vagrant
-- vagrant-hosts
+- `vagrant-hosts` plugin
+- `vagrant-cachier` plugin (optional)
 
-to run all virtual machines, `cd` to the directry including `Vagrantfile` and run `vagrant up`.
+You can change some envs. Please read `Vagrantfile`.
 
+To launch a cluster, run `vagrant up -d` in this dir.
 
+At this time, you can launch single control-plane cluster.
