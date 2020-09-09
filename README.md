@@ -1,5 +1,7 @@
 # VM Auto Provision for Testing Kubernetes cluster
 
+This is the dev branch for multi-master kubernetes cluster.
+
 Required:
 
 - virtualbox
@@ -10,5 +12,3 @@ Required:
 You can change some envs. Please read `Vagrantfile`.
 
 To launch a cluster, run `vagrant up -d` in this dir.
-
-At this time, you can launch single control-plane cluster.

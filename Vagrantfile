@@ -3,7 +3,7 @@
 
 Vagrant.configure("2") do |config|
 
-  control_plane_endpoint = "master-1"
+  load_balancer_fqdn = "k8s-lb"
   k8s_api_port = 6443
 
   """
@@ -15,7 +15,7 @@ Vagrant.configure("2") do |config|
   """
 
   # master node settings
-  num_master = 1
+  num_master = 3
   master_node_cpu = 2
   master_node_mem = 2048
 
@@ -41,6 +41,24 @@ Vagrant.configure("2") do |config|
     config.vm.provision :hosts, :sync_hosts => true
   end
   
+  config.vm.define "lb" do |lb|
+    lb.vm.provider "virtualbox" do |vb|
+      vb.name = load_balancer_fqdn
+      vb.cpus = 1
+      vb.memory = 512
+    end
+    lb.vm.network "private_network", type: "dhcp", virtualbox__intnet: "k8s"
+    lb.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
+    lb.vm.network "forwarded_port", guest: 443, host: 8443, host_ip: "127.0.0.1"
+    lb.vm.network "forwarded_port", guest: k8s_api_port, host: 6443, host_ip: "127.0.0.1"
+    lb.vm.provision "shell" do |s|
+      s.privileged = false
+      s.env = {"API_SERVER_PORT" => k8s_api_port, "NUM_MASTER" => num_master}
+      s.path = "node_init.sh"
+      s.args = ["lb"]
+    end
+  end
+
   (1..num_master).each do |i|
     config.vm.define "master-#{i}" do |master|
       master.vm.provider "virtualbox" do |vb|
@@ -49,14 +67,11 @@ Vagrant.configure("2") do |config|
         vb.memory = master_node_mem
       end
 
-      master.vm.network "private_network", ip: "10.10.10.1#{i}", virtualbox__intnet: "k8s"
-      master.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.#{i}"
-      master.vm.network "forwarded_port", guest: 443, host: 8443, host_ip: "127.0.0.#{i}"
-      master.vm.network "forwarded_port", guest: 6443, host: 6443, host_ip: "127.0.0.#{i}"
+      master.vm.network "private_network", type: "dhcp", virtualbox__intnet: "k8s"
       master.vm.provision "shell" do |s|
         s.privileged = false
-        s.env = {"CONTROL_PLANE_ENDPOINT" => control_plane_endpoint, "API_SERVER_PORT" => k8s_api_port}
-        s.path = "node_init.sh" 
+        s.env = {"CONTROL_PLANE_ENDPOINT" => load_balancer_fqdn, "API_SERVER_PORT" => k8s_api_port}
+        s.path = "node_init.sh"
         s.args = ["master"]
       end
     end
@@ -70,10 +85,10 @@ Vagrant.configure("2") do |config|
         vb.memory = worker_node_mem
       end
 
-      worker.vm.network "private_network", ip: "10.10.10.2#{i}", virtualbox__intnet: "k8s"
+      worker.vm.network "private_network", type: "dhcp", virtualbox__intnet: "k8s"
       worker.vm.provision "shell" do |s|
         s.privileged = false
-        s.env = {"CONTROL_PLANE_ENDPOINT" => control_plane_endpoint, "API_SERVER_PORT" => k8s_api_port}
+        s.env = {"CONTROL_PLANE_ENDPOINT" => load_balancer_fqdn, "API_SERVER_PORT" => k8s_api_port}
         s.path = "node_init.sh" 
         s.args = ["worker"]
       end

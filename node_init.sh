@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-
 setup_packages() {
 
   sudo add-apt-repository universe
@@ -84,7 +83,7 @@ master(){
 
   if [ "$(hostname)" = "master-1" ]; then
     # see: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#initializing-your-control-plane-node
-    sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint="$CONTROL_PLANE_ENDPOINT"
+    sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint="$CONTROL_PLANE_ENDPOINT" --upload-certs
 
     # To make kubectl work for your non-root user.
     mkdir -p "$HOME/.kube"
@@ -95,16 +94,30 @@ master(){
     kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 
     # make token list file
-    sudo kubeadm token create |
+    sudo kubeadm init phase upload-certs --upload-certs |
       sudo tee /vagrant/token.list
     openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt |
       openssl rsa -pubin -outform der 2>/dev/null |
       openssl dgst -sha256 -hex |
       sed 's/^.* //' |
       sudo tee -a /vagrant/token.list
+    sudo kubeadm alpha certs certificate-key |
+      sudo tee -a /vagrant/token.list
+  else
+    export TOKENs
+    export HASH
+    export CERT_KEY
+    TOKEN=$(sed -n 1p /vagrant/token.list)
+    HASH=$(sed -n 2p /vagrant/token.list)
+    CERT_KEY=$(sed -n 3p /vagrant/token.list)
+
+    sudo kubeadm join "$CONTROL_PLANE_ENDPOINT:$API_SERVER_PORT" \
+      --token "$TOKEN" \
+      --discovery-token-ca-cert-hash sha256:"$HASH" \
+      --control-plane \
+      --certificate-key "$CERT_KEY"
   fi
 }
-
 
 worker(){
   setup_packages
@@ -131,6 +144,33 @@ worker(){
   sudo kubeadm join "$CONTROL_PLANE_ENDPOINT:$API_SERVER_PORT" \
     --token "$TOKEN" \
     --discovery-token-ca-cert-hash sha256:"$HASH"
+}
+
+lb() {
+  setup_packages
+
+  # You can choose HAProxy version out of:
+  #   1.7, 1.8, 2.0, 2.1, 2.2
+  export HAPROXY_VERSION=2.2
+  export APISERVER_DEST_PORT=$API_SERVER_PORT
+  export APISERVER_SRC_PORT=$API_SERVER_PORT
+
+  # Setting up HAProxy
+  sudo apt install --yes software-properties-common
+  sudo add-apt-repository ppa:vbernat/haproxy-$HAPROXY_VERSION
+  sudo apt update
+  sudo apt install --yes haproxy=$HAPROXY_VERSION.\*
+  sudo systemctl enable haproxy
+  
+  envsubst \$APISERVER_DEST_PORT < /vagrant/config/lb/haproxy.cfg |
+    sudo dd of=/etc/haproxy/haproxy.cfg
+  for id in $(seq 1 "$NUM_MASTER"); do
+    echo "        server master-$id master-$id:$APISERVER_SRC_PORT check" |
+      sudo tee -a /etc/haproxy/haproxy.cfg
+  done
+
+  # Before setting up master nodes, you should not start haproxy process.
+  # sudo systemctl start haproxy
 }
 
 eval "$1"
