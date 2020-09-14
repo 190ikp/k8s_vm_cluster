@@ -3,7 +3,8 @@
 
 Vagrant.configure("2") do |config|
 
-  control_plane_endpoint = "master-1"
+  domain = ".local"
+  control_plane_endpoint = "master-1" + domain
   k8s_api_port = 6443
 
   """
@@ -15,6 +16,8 @@ Vagrant.configure("2") do |config|
   """
 
   # master node settings
+  # NOT support multi-master cluster
+  # DO NOT change 'num_master' variable
   num_master = 1
   master_node_cpu = 2
   master_node_mem = 2048
@@ -49,7 +52,8 @@ Vagrant.configure("2") do |config|
         vb.memory = master_node_mem
       end
 
-      master.vm.network "private_network", ip: "10.10.10.1#{i}", virtualbox__intnet: "k8s"
+      master.vm.hostname = "master-#{i}" + domain
+      master.vm.network "private_network", ip: "10.0.10.#{i+1}", netmask: "255.255.0.0", virtualbox__intnet: true
       master.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.#{i}"
       master.vm.network "forwarded_port", guest: 443, host: 8443, host_ip: "127.0.0.#{i}"
       master.vm.network "forwarded_port", guest: 6443, host: 6443, host_ip: "127.0.0.#{i}"
@@ -70,7 +74,8 @@ Vagrant.configure("2") do |config|
         vb.memory = worker_node_mem
       end
 
-      worker.vm.network "private_network", ip: "10.10.10.2#{i}", virtualbox__intnet: "k8s"
+      worker.vm.hostname = "worker-#{i}" + domain
+      worker.vm.network "private_network", ip: "10.0.20.#{i+1}", netmask: "255.255.0.0", virtualbox__intnet: true
       worker.vm.provision "shell" do |s|
         s.privileged = false
         s.env = {"CONTROL_PLANE_ENDPOINT" => control_plane_endpoint, "API_SERVER_PORT" => k8s_api_port}
