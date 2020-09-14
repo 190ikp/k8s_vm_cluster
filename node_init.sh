@@ -54,9 +54,9 @@ setup_k8s() {
 
   sudo apt update
   sudo apt install --yes \
-    kubelet kubeadm kubectl
+    kubelet kubeadm
   sudo apt-mark hold \
-    kubelet kubeadm kubectl
+    kubelet kubeadm
 }
 
 master(){
@@ -67,12 +67,10 @@ master(){
   sudo ufw --force reset
   # for vagrant ssh
   sudo ufw allow 22/tcp
-  sudo ufw allow 80/tcp
-  sudo ufw allow 443/tcp
   # see: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#check-required-ports
-  sudo ufw allow "$API_SERVER_PORT"/tcp
-  sudo ufw allow 2379:2380/tcp
-  sudo ufw allow 10250:10252/tcp
+  sudo ufw allow in from 10.0.0.0/16 to any proto tcp port "$API_SERVER_PORT"
+  sudo ufw allow in from 10.0.0.0/16 to any proto tcp port 2379:2380
+  sudo ufw allow in from 10.0.0.0/16 to any proto tcp port 10250:10252
   sudo ufw --force enable
 
   # Turning swap off is required by kubeadm. 
@@ -83,9 +81,11 @@ master(){
 
   if [ "$(hostname)" = "master-1" ]; then
     # see: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#initializing-your-control-plane-node
-    sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint="$CONTROL_PLANE_ENDPOINT" --upload-certs
+    sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint "$CONTROL_PLANE_ENDPOINT:$API_SERVER_PORT"
 
     # To make kubectl work for your non-root user.
+    sudo apt install --yes kubectl
+    sudo apt-mark hold kubectl
     mkdir -p "$HOME/.kube"
     sudo cp -f /etc/kubernetes/admin.conf "$HOME/.kube/config"
     sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
@@ -94,28 +94,30 @@ master(){
     kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 
     # make token list file
-    sudo kubeadm init phase upload-certs --upload-certs |
+    sudo kubeadm token create |
+      tail -n 1 |
       sudo tee /vagrant/token.list
     openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt |
       openssl rsa -pubin -outform der 2>/dev/null |
       openssl dgst -sha256 -hex |
       sed 's/^.* //' |
       sudo tee -a /vagrant/token.list
-    sudo kubeadm alpha certs certificate-key |
-      sudo tee -a /vagrant/token.list
+    # sudo kubeadm alpha certs certificate-key |
+    #   tail -n 1 |
+    #   sudo tee -a /vagrant/token.list
   else
-    export TOKENs
+    export TOKEN
     export HASH
-    export CERT_KEY
+    # export CERT_KEY
     TOKEN=$(sed -n 1p /vagrant/token.list)
     HASH=$(sed -n 2p /vagrant/token.list)
-    CERT_KEY=$(sed -n 3p /vagrant/token.list)
+    # CERT_KEY=$(sed -n 3p /vagrant/token.list)
 
     sudo kubeadm join "$CONTROL_PLANE_ENDPOINT:$API_SERVER_PORT" \
       --token "$TOKEN" \
       --discovery-token-ca-cert-hash sha256:"$HASH" \
-      --control-plane \
-      --certificate-key "$CERT_KEY"
+      --control-plane
+      # --certificate-key "$CERT_KEY"
   fi
 }
 
@@ -133,17 +135,17 @@ worker(){
   # for vagrant ssh
   sudo ufw allow 22/tcp
   # see: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#check-required-ports
-  sudo ufw allow 10250/tcp
-  sudo ufw allow 30000:32767/tcp
+  sudo ufw allow in from 10.0.0.0/16 to any proto tcp port 10250
+  sudo ufw allow in from 10.0.0.0/16 to any proto tcp port 30000:32767
   sudo ufw --force enable
 
   sudo swapoff -a
   sudo systemctl daemon-reload
   sudo systemctl restart kubelet
 
-  sudo kubeadm join "$CONTROL_PLANE_ENDPOINT:$API_SERVER_PORT" \
-    --token "$TOKEN" \
-    --discovery-token-ca-cert-hash sha256:"$HASH"
+  # sudo kubeadm join "$CONTROL_PLANE_ENDPOINT:$API_SERVER_PORT" \
+  #   --token "$TOKEN" \
+  #   --discovery-token-ca-cert-hash sha256:"$HASH"
 }
 
 lb() {
@@ -155,7 +157,15 @@ lb() {
   export APISERVER_DEST_PORT=$API_SERVER_PORT
   export APISERVER_SRC_PORT=$API_SERVER_PORT
 
+  sudo apt install --yes ufw
+  sudo ufw --force reset
+  # for vagrant ssh
+  sudo ufw allow 22/tcp
+  sudo ufw allow "$APISERVER_DEST_PORT"/tcp
+  sudo ufw --force enable
+
   # Setting up HAProxy
+  # see: https://github.com/kubernetes/kubeadm/blob/master/docs/ha-considerations.md
   sudo apt install --yes software-properties-common
   sudo add-apt-repository ppa:vbernat/haproxy-$HAPROXY_VERSION
   sudo apt update
@@ -165,12 +175,12 @@ lb() {
   envsubst \$APISERVER_DEST_PORT < /vagrant/config/lb/haproxy.cfg |
     sudo dd of=/etc/haproxy/haproxy.cfg
   for id in $(seq 1 "$NUM_MASTER"); do
-    echo "        server master-$id master-$id:$APISERVER_SRC_PORT check" |
+    echo "        server master-$id master-$id.local:$APISERVER_SRC_PORT check" |
       sudo tee -a /etc/haproxy/haproxy.cfg
   done
 
   # Before setting up master nodes, you should not start haproxy process.
-  # sudo systemctl start haproxy
+  sudo systemctl start haproxy
 }
 
 eval "$1"

@@ -3,8 +3,13 @@
 
 Vagrant.configure("2") do |config|
 
-  load_balancer_fqdn = "k8s-lb"
+  # load balancer settings
+  num_lb = 1
+  lb_cpu = 1
+  lb_mem = 512
   k8s_api_port = 6443
+  domain = ".local"
+  load_balancer_fqdn = "lb" + domain
 
   """
   It is recommended that all nodes have
@@ -25,8 +30,6 @@ Vagrant.configure("2") do |config|
   worker_node_mem = 2048
   
   config.vm.box = "ubuntu/bionic64"
-
-  config.vm.box_check_update = false
     
   config.vm.provider "virtualbox" do |vb|
     vb.customize ["modifyvm", :id, "--ostype", "Ubuntu_64", "--ioapic", "on"]
@@ -40,14 +43,16 @@ Vagrant.configure("2") do |config|
   if Vagrant.has_plugin?("vagrant-hosts")
     config.vm.provision :hosts, :sync_hosts => true
   end
-  
+
   config.vm.define "lb" do |lb|
     lb.vm.provider "virtualbox" do |vb|
-      vb.name = load_balancer_fqdn
-      vb.cpus = 1
-      vb.memory = 512
+      vb.name = "lb"
+      vb.cpus = lb_cpu
+      vb.memory = lb_mem
     end
-    lb.vm.network "private_network", type: "dhcp", virtualbox__intnet: "k8s"
+
+    lb.vm.hostname = load_balancer_fqdn
+    lb.vm.network "private_network", ip: "10.0.0.2", netmask: "255.255.0.0", virtualbox__intnet: true
     lb.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
     lb.vm.network "forwarded_port", guest: 443, host: 8443, host_ip: "127.0.0.1"
     lb.vm.network "forwarded_port", guest: k8s_api_port, host: 6443, host_ip: "127.0.0.1"
@@ -67,7 +72,8 @@ Vagrant.configure("2") do |config|
         vb.memory = master_node_mem
       end
 
-      master.vm.network "private_network", type: "dhcp", virtualbox__intnet: "k8s"
+      master.vm.hostname = "master-#{i}" + domain
+      master.vm.network "private_network", ip: "10.0.10.#{i+1}", netmask: "255.255.0.0", virtualbox__intnet: true
       master.vm.provision "shell" do |s|
         s.privileged = false
         s.env = {"CONTROL_PLANE_ENDPOINT" => load_balancer_fqdn, "API_SERVER_PORT" => k8s_api_port}
@@ -85,10 +91,11 @@ Vagrant.configure("2") do |config|
         vb.memory = worker_node_mem
       end
 
-      worker.vm.network "private_network", type: "dhcp", virtualbox__intnet: "k8s"
+      worker.vm.hostname = "worker-#{i}" + domain
+      worker.vm.network "private_network", ip: "10.0.20.#{i+1}", netmask: "255.255.0.0", virtualbox__intnet: true
       worker.vm.provision "shell" do |s|
         s.privileged = false
-        s.env = {"CONTROL_PLANE_ENDPOINT" => load_balancer_fqdn, "API_SERVER_PORT" => k8s_api_port}
+        s.env = {"CONTROL_PLANE_ENDPOINT" => "master-1.local", "API_SERVER_PORT" => k8s_api_port}
         s.path = "node_init.sh" 
         s.args = ["worker"]
       end
